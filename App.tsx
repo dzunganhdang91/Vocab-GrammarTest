@@ -3,7 +3,7 @@ import { QUESTIONS } from './constants';
 import { Question, Section, GrammarArea, TestState } from './types';
 
 // REPLACE THIS URL WITH THE IMAGE YOU UPLOADED
-const NAGUMO_IMAGE_URL = "https://static.wikia.nocookie.net/endless-fictional-arena/images/e/ea/Yoichi_Nagumo.png/revision/latest?cb=20250118174607&path-prefix=vi"; 
+const NAGUMO_IMAGE_URL = "/nagumo.png"; // Use the relative path to your file
 
 // --- Helper Functions ---
 
