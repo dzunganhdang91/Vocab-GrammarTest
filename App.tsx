@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { QUESTIONS } from './constants';
 import { Question, Section, GrammarArea, TestState } from './types';
 
-// REPLACE THIS URL WITH THE IMAGE YOU UPLOADED
-const NAGUMO_IMAGE_URL = "/nagumo.png"; // Use the relative path to your file
+// IMPORTANT: This path assumes your image file is named 'nagumo.png' 
+// and is located inside the 'public' folder.
+const NAGUMO_IMAGE_URL = "/nagumo.png"; 
 
 // --- Helper Functions ---
 
@@ -16,7 +17,7 @@ function shuffleArray<T>(array: T[]): T[] {
   return newArray;
 }
 
-// --- Sub-components (defined here for single-file adherence as requested, though usually separated) ---
+// --- Sub-components (IntroScreen, TestScreen, ResultScreen) ---
 
 const IntroScreen: React.FC<{
   onStart: (withTimer: boolean, name: string) => void;
@@ -368,6 +369,12 @@ const ResultScreen: React.FC<{
     return QUESTIONS
       .filter(q => q.section === Section.GRAMMAR && answers[q.id] !== q.correctOption);
   }, [answers]);
+  
+  // NEW LOGIC: Identify Incorrect Vocabulary Questions for Detailed Feedback
+  const incorrectVocabQuestions = useMemo(() => {
+    return QUESTIONS
+      .filter(q => q.section === Section.VOCABULARY && answers[q.id] !== q.correctOption);
+  }, [answers]);
 
   // Nagumo Comments Generation
   const getNagumoComment = () => {
@@ -444,7 +451,7 @@ const ResultScreen: React.FC<{
                 <img 
                   src={NAGUMO_IMAGE_URL}
                   alt="Nagumo Yoichi" 
-                  className="w-full h-full object-cover object-top transition duration-700 md:absolute md:inset-0"
+                  className="w-full h-full object-contain transition duration-700" 
                 />
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                    <h4 className="font-bold text-xl text-white">Nagumo Yoichi</h4>
@@ -470,9 +477,9 @@ const ResultScreen: React.FC<{
           </div>
         </div>
 
-        {/* Detailed Grammar Analysis */}
+        {/* Detailed Analysis (Including new Vocab Corrections) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* General Stats */}
+          {/* Left Column: Grammar Focus Areas */}
           <div className="bg-white rounded-2xl shadow-lg p-8">
              <h3 className="text-xl font-bold text-gray-800 mb-6">Grammar Focus Areas</h3>
              <div className="space-y-4">
@@ -493,42 +500,79 @@ const ResultScreen: React.FC<{
              </div>
           </div>
 
-          {/* Specific Explanations for Incorrect Answers */}
-          {incorrectGrammarQuestions.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
-                Detailed Corrections
-                <span className="ml-2 bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">{incorrectGrammarQuestions.length} mistakes</span>
-              </h3>
-              <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                {incorrectGrammarQuestions.map((q) => (
-                  <div key={q.id} className="border-l-4 border-red-400 pl-4 py-2 bg-red-50 rounded-r-lg">
-                    <p className="text-sm font-semibold text-gray-900 mb-1">{q.id}: {q.text}</p>
-                    
-                    <div className="flex flex-wrap gap-2 text-sm mb-2">
-                       <span className="px-2 py-0.5 bg-red-200 text-red-800 rounded">
-                         <span className="font-bold">You:</span> {answers[q.id] ? q.options[answers[q.id]] : 'No Answer'}
-                       </span>
-                       <span className="px-2 py-0.5 bg-green-200 text-green-800 rounded">
-                         <span className="font-bold">Correct:</span> {q.options[q.correctOption]}
-                       </span>
-                    </div>
+          {/* Right Column: Corrections Cards (Grouped vertically) */}
+          <div className="space-y-8">
+            
+            {/* NEW: Specific Explanations for Incorrect VOCABULARY Answers */}
+            {incorrectVocabQuestions.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-lg p-8">
+                <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                  Vocabulary Corrections
+                  <span className="ml-2 bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">{incorrectVocabQuestions.length} mistakes</span>
+                </h3>
+                <div className="space-y-6 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                  {incorrectVocabQuestions.map((q) => (
+                    <div key={q.id} className="border-l-4 border-red-400 pl-4 py-2 bg-red-50 rounded-r-lg">
+                      <p className="text-sm font-semibold text-gray-900 mb-1">{q.id}: {q.text}</p>
+                      
+                      <div className="flex flex-wrap gap-2 text-sm mb-2">
+                        <span className="px-2 py-0.5 bg-red-200 text-red-800 rounded">
+                          <span className="font-bold">You:</span> {answers[q.id] ? q.options[answers[q.id]] : 'No Answer'}
+                        </span>
+                        <span className="px-2 py-0.5 bg-green-200 text-green-800 rounded">
+                          <span className="font-bold">Correct:</span> {q.options[q.correctOption]}
+                        </span>
+                      </div>
 
-                    {q.explanation && (
-                      <p className="text-sm text-gray-700 italic">
-                        <span className="font-bold not-italic text-nagumo-700">Why? </span>
-                        {q.explanation}
-                      </p>
-                    )}
-                    
-                    <div className="mt-2 text-xs text-gray-500 uppercase font-bold tracking-wider">
-                      {q.grammarArea}
+                      {q.explanation && ( // <-- This displays the explanation
+                        <p className="text-sm text-gray-700 italic">
+                          <span className="font-bold not-italic text-nagumo-700">Why? </span>
+                          {q.explanation}
+                        </p>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Existing: Specific Explanations for Incorrect GRAMMAR Answers */}
+            {incorrectGrammarQuestions.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-lg p-8">
+                <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                  Grammar Corrections
+                  <span className="ml-2 bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">{incorrectGrammarQuestions.length} mistakes</span>
+                </h3>
+                <div className="space-y-6 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                  {incorrectGrammarQuestions.map((q) => (
+                    <div key={q.id} className="border-l-4 border-red-400 pl-4 py-2 bg-red-50 rounded-r-lg">
+                      <p className="text-sm font-semibold text-gray-900 mb-1">{q.id}: {q.text}</p>
+                      
+                      <div className="flex flex-wrap gap-2 text-sm mb-2">
+                        <span className="px-2 py-0.5 bg-red-200 text-red-800 rounded">
+                          <span className="font-bold">You:</span> {answers[q.id] ? q.options[answers[q.id]] : 'No Answer'}
+                        </span>
+                        <span className="px-2 py-0.5 bg-green-200 text-green-800 rounded">
+                          <span className="font-bold">Correct:</span> {q.options[q.correctOption]}
+                        </span>
+                      </div>
+
+                      {q.explanation && (
+                        <p className="text-sm text-gray-700 italic">
+                          <span className="font-bold not-italic text-nagumo-700">Why? </span>
+                          {q.explanation}
+                        </p>
+                      )}
+                      
+                      <div className="mt-2 text-xs text-gray-500 uppercase font-bold tracking-wider">
+                        {q.grammarArea}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="text-center pb-8">
