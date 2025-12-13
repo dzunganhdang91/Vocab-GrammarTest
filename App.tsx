@@ -3,8 +3,9 @@ import { QUESTIONS } from './constants';
 import { Question, Section, GrammarArea, TestState } from './types';
 
 // IMPORTANT: This path assumes your image file is named 'nagumo.png' 
-// and is located inside the 'public' folder.
-const NAGUMO_IMAGE_URL = "/nagumo.png"; 
+// and is located inside the 'public' folder. Please check if your file 
+// is Nagumo.png, in which case you must change this to "/Nagumo.png".
+const NAGUMO_IMAGE_URL = "/YOICHI.png"; 
 
 // --- Helper Functions ---
 
@@ -251,7 +252,7 @@ const TestScreen: React.FC<{
                      className="w-4 h-4 text-nagumo-600 border-gray-300 focus:ring-nagumo-500"
                    />
                    <span className="ml-3 text-gray-700">
-                     <span className="font-bold text-gray-500 mr-2">{key}.</span> {value}
+                     {value} {/* FIXED: Only show the value, not the key letter */}
                    </span>
                  </label>
                ))}
@@ -370,7 +371,7 @@ const ResultScreen: React.FC<{
       .filter(q => q.section === Section.GRAMMAR && answers[q.id] !== q.correctOption);
   }, [answers]);
   
-  // NEW LOGIC: Identify Incorrect Vocabulary Questions for Detailed Feedback
+  // LOGIC FOR VOCABULARY KEY
   const incorrectVocabQuestions = useMemo(() => {
     return QUESTIONS
       .filter(q => q.section === Section.VOCABULARY && answers[q.id] !== q.correctOption);
@@ -503,7 +504,7 @@ const ResultScreen: React.FC<{
           {/* Right Column: Corrections Cards (Grouped vertically) */}
           <div className="space-y-8">
             
-            {/* NEW: Specific Explanations for Incorrect VOCABULARY Answers */}
+            {/* 1. VOCABULARY CORRECTIONS (This renders the requested Vocab Key) */}
             {incorrectVocabQuestions.length > 0 && (
               <div className="bg-white rounded-2xl shadow-lg p-8">
                 <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
@@ -524,7 +525,7 @@ const ResultScreen: React.FC<{
                         </span>
                       </div>
 
-                      {q.explanation && ( // <-- This displays the explanation
+                      {q.explanation && (
                         <p className="text-sm text-gray-700 italic">
                           <span className="font-bold not-italic text-nagumo-700">Why? </span>
                           {q.explanation}
@@ -536,7 +537,7 @@ const ResultScreen: React.FC<{
               </div>
             )}
 
-            {/* Existing: Specific Explanations for Incorrect GRAMMAR Answers */}
+            {/* 2. GRAMMAR CORRECTIONS */}
             {incorrectGrammarQuestions.length > 0 && (
               <div className="bg-white rounded-2xl shadow-lg p-8">
                 <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">

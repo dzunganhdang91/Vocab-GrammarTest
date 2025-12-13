@@ -1,7 +1,7 @@
 import { Question, Section, GrammarArea } from './types';
 
 export const QUESTIONS: Question[] = [
-  // SECTION 1: VOCABULARY (ALL now include an explanation)
+  // SECTION 1: VOCABULARY (Includes explanations for the correction feature)
   { id: 'V1', text: 'A university library is a place where students can ____ books for study.', options: { A: 'borrow', B: 'lend', C: 'sell', D: 'publish' }, correctOption: 'A', section: Section.VOCABULARY, explanation: 'To borrow means to take and use something belonging to someone else with the intention of returning it.' },
   { id: 'V2', text: 'The purpose of the lecture was to ____ basic research methods.', options: { A: 'explain', B: 'argue', C: 'criticize', D: 'replace' }, correctOption: 'A', section: Section.VOCABULARY, explanation: 'To explain means to make an idea or situation clear to someone by describing it in more detail.' },
   { id: 'V3', text: 'The chart shows an ____ in population over time.', options: { A: 'increase', B: 'mistake', C: 'absence', D: 'argument' }, correctOption: 'A', section: Section.VOCABULARY, explanation: 'An increase refers to a rise in the amount, size, or intensity of something.' },
@@ -100,8 +100,4 @@ export const QUESTIONS: Question[] = [
   { id: 'G94', text: 'Most household waste ____ recycled in urban areas.', options: { A: 'are', B: 'recycle', C: 'need recycling', D: 'is recycling' }, correctOption: 'C', section: Section.GRAMMAR, grammarArea: GrammarArea.PASSIVE_VOICE, explanation: '"Need recycling" (or "needs to be recycled") is a passive construction.' },
   { id: 'G95', text: 'The bridge ____ repaired while traffic is redirected.', options: { A: 'is being', B: 'is', C: 'was', D: 'has been' }, correctOption: 'A', section: Section.GRAMMAR, grammarArea: GrammarArea.PASSIVE_VOICE, explanation: '"Is being repaired" (Present Continuous Passive) describes an action happening now.' },
   { id: 'G96', text: '____ the sample size was small, the findings were significant.', options: { A: 'Although', B: 'Because', C: 'So', D: 'Therefore' }, correctOption: 'A', section: Section.GRAMMAR, grammarArea: GrammarArea.CONNECTORS, explanation: '"Although" introduces a contrast between the small sample and significant findings.' },
-  { id: 'G97', text: 'The results were inconclusive; ____, further research is required.', options: { A: 'however', B: 'despite this', C: 'in addition', D: 'therefore' }, correctOption: 'D', section: Section.GRAMMAR, grammarArea: GrammarArea.CONNECTORS, explanation: '"Therefore" introduces a logical consequence or result.' },
-  { id: 'G98', text: '____, the study failed to address ethical concerns.', options: { A: 'Frankly', B: 'Unfortunately', C: 'Personally', D: 'Interestingly' }, correctOption: 'B', section: Section.GRAMMAR, grammarArea: GrammarArea.CONNECTORS, explanation: '"Unfortunately" is used to introduce negative or disappointing news.' },
-  { id: 'G99', text: '____, the results confirm earlier assumptions.', options: { A: 'Interestingly', B: 'Definitely', C: 'Personally', D: 'Frankly' }, correctOption: 'A', section: Section.GRAMMAR, grammarArea: GrammarArea.CONNECTORS, explanation: '"Interestingly" introduces a point that attracts attention or is noteworthy.' },
-  { id: 'G100', text: 'The sudden ____ of the building caused public concern.', options: { A: 'appearance', B: 'appearing', C: 'appear', D: 'appeared' }, correctOption: 'A', section: Section.GRAMMAR, grammarArea: GrammarArea.WORD_FORMATION, explanation: '"Appearance" is the noun form required after the article/adjective ("The sudden...").' },
-];
+  { id: 'G97', text: 'The results were
