@@ -2,13 +2,13 @@
   "name": "nagumo's-english-assessment",
   "private": true,
   "version": "0.0.0",
-  "homepage": "https://dzunganhdang91.github.io/Vocab-GrammarTest"
+  "homepage": "https://dzunganhdang91.github.io/Vocab-GrammarTest",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
-    "predeploy": "npm run build"
+    "preview": "vite preview",
+    "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
