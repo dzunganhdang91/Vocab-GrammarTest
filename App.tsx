@@ -23,10 +23,12 @@ const formatTime = (seconds: number) => {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 };
 
-// FIX for 'undefined' label (TENSES_FUTURE)
+// FIX for GrammarArea.TENSES: Renames the internal enum name for display
 const getGrammarAreaLabel = (area: GrammarArea | undefined): string => {
     if (!area) return 'Unknown Area';
-    if (area === GrammarArea.TENSES_FUTURE) return 'Verb Tenses'; // Renamed
+    // Match the enum member TENSES and display the desired name "Verb Tenses"
+    if (area === GrammarArea.TENSES) return 'Verb Tenses'; 
+    // For all other areas (which use their display name as their enum value)
     return area;
 };
 
@@ -127,7 +129,6 @@ const TestScreen: React.FC<{
     const map: { [key: string]: [string, string][] } = {};
     if (Array.isArray(QUESTIONS)) {
         QUESTIONS.forEach(q => {
-             // Null check added for safety during development
             if (typeof q.options === 'object' && q.options !== null) {
                 const entries = Object.entries(q.options);
                 map[q.id] = shuffleArray(entries);
@@ -319,11 +320,10 @@ const ResultScreen: React.FC<{
   answers: { [id: string]: string };
   onRetry: () => void;
   studentName: string;
-  // NOTE: timeTaken is required for the full printing feature
   timeTaken: number; 
 }> = ({ answers, onRetry, studentName, timeTaken = 0 }) => {
     
-  const reportRef = useRef(null); // Ref for the printable area
+  const reportRef = useRef(null); 
 
   // --- Calculation Logic ---
   
@@ -365,7 +365,7 @@ const ResultScreen: React.FC<{
     }
   };
 
-  // Grammar Areas Analysis (Updated to use the fixed label)
+  // Grammar Areas Analysis (Uses the fixed label via getGrammarAreaLabel)
   const grammarAnalysis = useMemo(() => {
     const areas: { [key: string]: { correct: number, total: number } } = {};
     const grammarQuestions = QUESTIONS.filter(q => q.section === Section.GRAMMAR);
@@ -383,28 +383,23 @@ const ResultScreen: React.FC<{
     })).sort((a, b) => a.percentage - b.percentage); // Lowest first
   }, [answers]);
 
-  // Nagumo Comments Generation (Updated to use the fixed label)
+  // Nagumo Comments Generation
   const getNagumoComment = () => {
     const totalPercentage = ((vocabScore.correct + grammarScore.correct) / 100) * 100;
-    // Use the processed analysis list for weak areas
     const weakGrammarAreas = grammarAnalysis.filter(a => a.percentage < 60).map(a => a.area);
     
-    // Personalize with Name
     let comment = `Listen up, ${studentName || 'student'}. Here is your evaluation. `;
     
-    // Intro
     if (totalPercentage > 90) comment += "Excellent work. You've demonstrated a command of the language that rivals native speakers. ";
     else if (totalPercentage > 75) comment += "Very impressive. You have a solid grasp of complex structures, though minor refinements are possible. ";
     else if (totalPercentage > 50) comment += "A solid effort. You have the foundations, but there are specific gaps we need to address to reach the next level. ";
     else comment += "We have work to do. The foundation is shaky, but with consistent practice, improvement is inevitable. ";
 
-    // Vocab Specific
     comment += `\n\nRegarding Vocabulary (${vocabLevel}): `;
     if (vocabLevel === 'C2' || vocabLevel === 'C1') comment += "Your lexical resource is sophisticated. You handled abstract concepts and nuance effectively.";
     else if (vocabLevel === 'B2' || vocabLevel === 'B1') comment += "You manage standard communication well, but struggle slightly with lower-frequency academic terms.";
     else comment += "We need to build your core lexicon. Focus on high-frequency academic word lists first.";
 
-    // Grammar Specific
     comment += `\n\nRegarding Grammar (${grammarLevel}): `;
     if (weakGrammarAreas.length === 0) {
       comment += "I can find no significant structural weaknesses. Your accuracy is commendable.";
@@ -421,6 +416,7 @@ const ResultScreen: React.FC<{
     if (!input) return;
 
     if (input instanceof HTMLElement) {
+        // Temporarily add a class to adjust layout for printing/PDF generation
         input.classList.add('report-print-mode');
     }
     
@@ -455,7 +451,7 @@ const ResultScreen: React.FC<{
     });
   };
 
-  // NEW Component: Printable Report for Print Formatting (Question Breakdown)
+  // Component: Printable Report for Print Formatting (Full Question Breakdown)
   const PrintableReport: React.FC = () => (
     <div ref={reportRef} className="printable-report-container p-6 bg-white max-w-4xl mx-auto shadow-none">
         <h1 className="text-3xl font-extrabold text-gray-900 mb-2">English Assessment Report</h1>
@@ -465,7 +461,7 @@ const ResultScreen: React.FC<{
             Date: {new Date().toLocaleDateString()}
         </p>
 
-        {/* 1. Summary of Results (Keep original design for the summary) */}
+        {/* 1. Summary of Results */}
         <h2 className="text-2xl font-bold text-gray-800 mb-4 mt-6">1. Summary of Results</h2>
         <div className="grid grid-cols-2 gap-4 mb-8">
             <div className="p-4 border rounded-lg bg-blue-50">
@@ -482,7 +478,6 @@ const ResultScreen: React.FC<{
 
         {/* 2. Nagumo Comments */}
         <h2 className="text-2xl font-bold text-gray-800 mb-4 mt-8">2. Nagumo Yoichi's Evaluation</h2>
-        {/* ... (Omitted Nagumo image/comment block for brevity, assuming it remains the same) ... */}
         <div className="flex flex-col md:flex-row mb-8 border border-nagumo-200 rounded-lg overflow-hidden">
              <div className="w-full md:w-2/5 relative min-h-[250px] overflow-hidden">
                 <img src={NAGUMO_IMAGE_URL} alt="Nagumo Yoichi" className="w-full h-full object-cover object-top" />
@@ -504,10 +499,10 @@ const ResultScreen: React.FC<{
             const userSelection = answers[q.id] ? q.options[answers[q.id]] : "No Answer";
             const correctSelection = q.options[q.correctOption];
             
-            // New Tag Logic: Grammar Area or Vocab Level
+            // CORRECTED TAG LOGIC: Read specific vocabLevel property from question object
             const educationalTag = q.section === Section.GRAMMAR 
                 ? getGrammarAreaLabel(q.grammarArea) 
-                : `Vocab Level ${vocabLevel}`; // Uses the overall calculated level for VQs
+                : `Vocab Level ${q.vocabLevel || 'N/A'}`; 
 
             return (
                 <div key={q.id} className={`break-inside-avoid border-l-4 p-4 mb-4 rounded-r-lg shadow-sm print:shadow-none ${isCorrect ? 'border-green-400 bg-green-50' : 'border-red-400 bg-red-50'}`}>
@@ -558,8 +553,6 @@ const ResultScreen: React.FC<{
       <div className="max-w-4xl mx-auto space-y-8">
         
         {/* Header Results */}
-        {/* ... (Omitted Header Results for brevity, assuming it remains the same) ... */}
-        
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           <div className="bg-slate-800 text-white p-6 text-center">
              <h2 className="text-3xl font-bold">Assessment Results for {studentName}</h2>
@@ -598,7 +591,37 @@ const ResultScreen: React.FC<{
         </div>
 
         {/* Nagumo Yoichi Feedback Card */}
-        {/* ... (Omitted Nagumo Feedback Card for brevity, keeping only the new breakdown) ... */}
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-nagumo-200 relative">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-nagumo-400 to-nagumo-600"></div>
+          <div className="flex flex-col md:flex-row">
+            <div className="w-full md:w-2/5 bg-slate-50 flex flex-col items-center justify-start p-0 border-b md:border-b-0 md:border-r border-gray-100">
+              <div className="w-full h-full min-h-[300px] md:min-h-[400px] relative overflow-visible group"> 
+                <img 
+                  src={NAGUMO_IMAGE_URL}
+                  alt="Nagumo Yoichi" 
+                  className="w-full h-full object-contain transition duration-700" 
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+                   <h4 className="font-bold text-xl text-white">Nagumo Yoichi</h4>
+                   <p className="text-sm text-gray-300 uppercase tracking-wider font-semibold">Student Council</p>
+                </div>
+              </div>
+            </div>
+            <div className="w-full md:w-3/5 p-8 flex flex-col justify-center">
+              <h3 className="text-nagumo-800 font-black text-xl uppercase tracking-widest mb-4 flex items-center">
+                <span className="w-2 h-8 bg-nagumo-500 mr-3 inline-block rounded-sm"></span>
+                NAGUMO YOICHI WOULD SAY:
+              </h3>
+              <div className="prose prose-blue max-w-none text-gray-700 leading-relaxed italic bg-gray-50 p-6 rounded-lg border border-gray-100 relative shadow-inner">
+                <span className="absolute top-2 left-2 text-4xl text-gray-300 font-serif">"</span>
+                {getNagumoComment().split('\n\n').map((paragraph, idx) => (
+                  <p key={idx} className="mb-4 last:mb-0 relative z-10">{paragraph}</p>
+                ))}
+                <span className="absolute bottom-[-10px] right-4 text-4xl text-gray-300 font-serif">"</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Detailed Analysis (Grammar Focus Areas) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -636,9 +659,6 @@ const ResultScreen: React.FC<{
         </div>
 
       </div>
-      
-      {/* Hidden container is no longer needed since PrintableReport is rendered directly for print/PDF */}
-      
     </div>
   );
 };
@@ -655,22 +675,18 @@ const App: React.FC = () => {
     studentName: ''
   });
   
-  // Track time taken specifically for the result screen
   const [timeTaken, setTimeTaken] = useState(0); 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (testState.status === 'active') {
-      // Start a timer that increments timeTaken every second
       timerRef.current = setInterval(() => {
         setTimeTaken(prevTime => prevTime + 1);
       }, 1000);
     } else if (timerRef.current) {
-      // Clear the timer when the test is submitted or restarted
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    // Cleanup on unmount
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -679,12 +695,11 @@ const App: React.FC = () => {
   }, [testState.status]);
 
   const startTest = (withTimer: boolean, name: string) => {
-    // Reset timeTaken to 0 when starting a new test
     setTimeTaken(0); 
     setTestState({
       status: 'active',
       timerEnabled: withTimer,
-      timeRemaining: 3000, // 50 mins = 3000 seconds
+      timeRemaining: 3000, 
       answers: {},
       extensionsUsed: 0,
       studentName: name
@@ -708,7 +723,7 @@ const App: React.FC = () => {
   };
 
   return (
-    // FIX: Re-implementing the CSS fix that prevents horizontal overflow
+    // FINAL CSS FIX: Constrain the root container to prevent horizontal overflow/shifting
     <div className="max-w-full overflow-x-hidden">
       {testState.status === 'intro' && <IntroScreen onStart={startTest} />}
       {testState.status === 'active' && (
@@ -723,7 +738,7 @@ const App: React.FC = () => {
           answers={testState.answers} 
           onRetry={restartTest} 
           studentName={testState.studentName}
-          timeTaken={timeTaken} // Pass time taken for the report
+          timeTaken={timeTaken} 
         />
       )}
     </div>
