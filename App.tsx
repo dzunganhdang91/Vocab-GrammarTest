@@ -1,11 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { QUESTIONS } from './constants';
 import { Question, Section, GrammarArea, TestState } from './types';
 
-// IMPORTANT: This path assumes your image file is named 'nagumo.png' 
-// and is located inside the 'public' folder. Please check if your file 
-// is Nagumo.png, in which case you must change this to "/Nagumo.png".
-const NAGUMO_IMAGE_URL = "/YOICHI.png"; 
+// The confirmed external image URL (Stable)
+const NAGUMO_IMAGE_URL = "https://i.postimg.cc/g0z5TD8p/YOICHI.png"; 
 
 // --- Helper Functions ---
 
@@ -17,6 +15,20 @@ function shuffleArray<T>(array: T[]): T[] {
   }
   return newArray;
 }
+
+// Function to convert time in seconds to mm:ss format
+const formatTime = (seconds: number) => {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+};
+
+// FIX for 'undefined' label (TENSES_FUTURE)
+const getGrammarAreaLabel = (area: GrammarArea | undefined): string => {
+    if (!area) return 'Unknown Area';
+    if (area === GrammarArea.TENSES_FUTURE) return 'Verb Tenses'; // Renamed
+    return area;
+};
 
 // --- Sub-components (IntroScreen, TestScreen, ResultScreen) ---
 
@@ -113,10 +125,17 @@ const TestScreen: React.FC<{
   
   const shuffledOptionsMap = useMemo(() => {
     const map: { [key: string]: [string, string][] } = {};
-    QUESTIONS.forEach(q => {
-      const entries = Object.entries(q.options);
-      map[q.id] = shuffleArray(entries);
-    });
+    if (Array.isArray(QUESTIONS)) {
+        QUESTIONS.forEach(q => {
+             // Null check added for safety during development
+            if (typeof q.options === 'object' && q.options !== null) {
+                const entries = Object.entries(q.options);
+                map[q.id] = shuffleArray(entries);
+            } else {
+                map[q.id] = [];
+            }
+        });
+    }
     return map;
   }, []);
 
@@ -135,12 +154,6 @@ const TestScreen: React.FC<{
 
     return () => clearInterval(timer);
   }, [testState.timerEnabled, testState.status, setTestState]);
-
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
 
   const handleAnswer = (questionId: string, option: string) => {
     setTestState(prev => ({
@@ -252,7 +265,7 @@ const TestScreen: React.FC<{
                      className="w-4 h-4 text-nagumo-600 border-gray-300 focus:ring-nagumo-500"
                    />
                    <span className="ml-3 text-gray-700">
-                     {value} {/* FIXED: Only show the value, not the key letter */}
+                     {value}
                    </span>
                  </label>
                ))}
@@ -306,7 +319,12 @@ const ResultScreen: React.FC<{
   answers: { [id: string]: string };
   onRetry: () => void;
   studentName: string;
-}> = ({ answers, onRetry, studentName }) => {
+  // NOTE: timeTaken is required for the full printing feature
+  timeTaken: number; 
+}> = ({ answers, onRetry, studentName, timeTaken = 0 }) => {
+    
+  const reportRef = useRef(null); // Ref for the printable area
+
   // --- Calculation Logic ---
   
   const calculateScore = (section: Section) => {
@@ -347,16 +365,16 @@ const ResultScreen: React.FC<{
     }
   };
 
-  // Grammar Areas Analysis
+  // Grammar Areas Analysis (Updated to use the fixed label)
   const grammarAnalysis = useMemo(() => {
-    const areas: { [key in GrammarArea]?: { correct: number, total: number } } = {};
+    const areas: { [key: string]: { correct: number, total: number } } = {};
     const grammarQuestions = QUESTIONS.filter(q => q.section === Section.GRAMMAR);
     
     grammarQuestions.forEach(q => {
-      const area = q.grammarArea!;
-      if (!areas[area]) areas[area] = { correct: 0, total: 0 };
-      areas[area]!.total++;
-      if (answers[q.id] === q.correctOption) areas[area]!.correct++;
+      const areaKey = getGrammarAreaLabel(q.grammarArea); // Use the fixed label here
+      if (!areas[areaKey]) areas[areaKey] = { correct: 0, total: 0 };
+      areas[areaKey]!.total++;
+      if (answers[q.id] === q.correctOption) areas[areaKey]!.correct++;
     });
 
     return Object.entries(areas).map(([area, stats]) => ({
@@ -365,21 +383,10 @@ const ResultScreen: React.FC<{
     })).sort((a, b) => a.percentage - b.percentage); // Lowest first
   }, [answers]);
 
-  // Identify Incorrect Grammar Questions for Detailed Feedback
-  const incorrectGrammarQuestions = useMemo(() => {
-    return QUESTIONS
-      .filter(q => q.section === Section.GRAMMAR && answers[q.id] !== q.correctOption);
-  }, [answers]);
-  
-  // LOGIC FOR VOCABULARY KEY
-  const incorrectVocabQuestions = useMemo(() => {
-    return QUESTIONS
-      .filter(q => q.section === Section.VOCABULARY && answers[q.id] !== q.correctOption);
-  }, [answers]);
-
-  // Nagumo Comments Generation
+  // Nagumo Comments Generation (Updated to use the fixed label)
   const getNagumoComment = () => {
     const totalPercentage = ((vocabScore.correct + grammarScore.correct) / 100) * 100;
+    // Use the processed analysis list for weak areas
     const weakGrammarAreas = grammarAnalysis.filter(a => a.percentage < 60).map(a => a.area);
     
     // Personalize with Name
@@ -408,18 +415,157 @@ const ResultScreen: React.FC<{
     return comment;
   };
 
+  // PDF Generation function (re-implemented)
+  const handlePrintToPDF = () => {
+    const input = reportRef.current;
+    if (!input) return;
+
+    if (input instanceof HTMLElement) {
+        input.classList.add('report-print-mode');
+    }
+    
+    // @ts-ignore
+    window.html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
+      const imgData = canvas.toDataURL('image/png');
+      // @ts-ignore
+      const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      const imgProps = pdf.getImageProperties(imgData);
+      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+      heightLeft -= pdfHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      pdf.save(`Assessment_Report_${studentName.replace(/\s+/g, '_')}.pdf`);
+      
+      if (input instanceof HTMLElement) {
+        input.classList.remove('report-print-mode'); // Clean up class
+      }
+    });
+  };
+
+  // NEW Component: Printable Report for Print Formatting (Question Breakdown)
+  const PrintableReport: React.FC = () => (
+    <div ref={reportRef} className="printable-report-container p-6 bg-white max-w-4xl mx-auto shadow-none">
+        <h1 className="text-3xl font-extrabold text-gray-900 mb-2">English Assessment Report</h1>
+        <p className="text-lg text-gray-600 mb-6 border-b pb-4">
+            Student: <span className="font-semibold">{studentName}</span> | 
+            Time Taken: <span className="font-semibold">{formatTime(timeTaken)}</span> | 
+            Date: {new Date().toLocaleDateString()}
+        </p>
+
+        {/* 1. Summary of Results (Keep original design for the summary) */}
+        <h2 className="text-2xl font-bold text-gray-800 mb-4 mt-6">1. Summary of Results</h2>
+        <div className="grid grid-cols-2 gap-4 mb-8">
+            <div className="p-4 border rounded-lg bg-blue-50">
+                <p className="font-bold text-lg text-blue-700">Vocabulary Score: {vocabScore.correct}/{vocabScore.total}</p>
+                <p className="text-sm">Cambridge Level: <span className="font-bold">{vocabLevel}</span></p>
+                <p className="text-sm">IELTS Equivalent: <span className="font-bold">{getIeltsScore(vocabLevel)}</span></p>
+            </div>
+            <div className="p-4 border rounded-lg bg-indigo-50">
+                <p className="font-bold text-lg text-indigo-700">Grammar Score: {grammarScore.correct}/{grammarScore.total}</p>
+                <p className="text-sm">Cambridge Level: <span className="font-bold">{grammarLevel}</span></p>
+                <p className="text-sm">IELTS Equivalent: <span className="font-bold">{getIeltsScore(grammarLevel)}</span></p>
+            </div>
+        </div>
+
+        {/* 2. Nagumo Comments */}
+        <h2 className="text-2xl font-bold text-gray-800 mb-4 mt-8">2. Nagumo Yoichi's Evaluation</h2>
+        {/* ... (Omitted Nagumo image/comment block for brevity, assuming it remains the same) ... */}
+        <div className="flex flex-col md:flex-row mb-8 border border-nagumo-200 rounded-lg overflow-hidden">
+             <div className="w-full md:w-2/5 relative min-h-[250px] overflow-hidden">
+                <img src={NAGUMO_IMAGE_URL} alt="Nagumo Yoichi" className="w-full h-full object-cover object-top" />
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+                    <h4 className="font-bold text-xl text-white">Nagumo Yoichi</h4>
+                    <p className="text-sm text-gray-300 uppercase tracking-wider font-semibold">Student Council</p>
+                </div>
+            </div>
+            <div className="w-full md:w-3/5 p-6 bg-gray-50 italic text-gray-700 whitespace-pre-wrap">
+                {getNagumoComment()}
+            </div>
+        </div>
+
+        {/* 3. FULL QUESTION BREAKDOWN (New Requirement) */}
+        <h2 className="text-2xl font-bold text-gray-800 mb-4 mt-8 break-before-page">3. Full Question Breakdown</h2>
+        
+        {QUESTIONS.map((q) => {
+            const isCorrect = answers[q.id] === q.correctOption;
+            const userSelection = answers[q.id] ? q.options[answers[q.id]] : "No Answer";
+            const correctSelection = q.options[q.correctOption];
+            
+            // New Tag Logic: Grammar Area or Vocab Level
+            const educationalTag = q.section === Section.GRAMMAR 
+                ? getGrammarAreaLabel(q.grammarArea) 
+                : `Vocab Level ${vocabLevel}`; // Uses the overall calculated level for VQs
+
+            return (
+                <div key={q.id} className={`break-inside-avoid border-l-4 p-4 mb-4 rounded-r-lg shadow-sm print:shadow-none ${isCorrect ? 'border-green-400 bg-green-50' : 'border-red-400 bg-red-50'}`}>
+                    
+                    <div className="flex justify-between items-start mb-2">
+                        <p className="font-semibold text-base text-gray-900">{q.id}. {q.text}</p>
+                        {/* The new educational tag */}
+                        <span className={`flex-shrink-0 text-xs font-bold px-2 py-1 rounded ml-3 uppercase tracking-wider ${
+                            q.section === Section.GRAMMAR ? 'bg-indigo-200 text-indigo-800' : 'bg-blue-200 text-blue-800'
+                        }`}>
+                            {educationalTag}
+                        </span>
+                    </div>
+                    
+                    <div className="text-sm border-t pt-2 mt-2">
+                        {/* Student Answer */}
+                        <p className="mb-1">
+                            <span className="font-bold mr-1">Your Answer:</span>
+                            <span className={`px-2 py-0.5 rounded ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {userSelection}
+                            </span>
+                        </p>
+                        
+                        {/* Correct Answer (Key Highlighted) */}
+                        <p className="mb-1">
+                            <span className="font-bold mr-1">Correct Answer:</span>
+                            <span className="px-2 py-0.5 rounded font-bold bg-green-200 text-green-800">
+                                {correctSelection}
+                            </span>
+                        </p>
+                    </div>
+
+                    {q.explanation && (
+                        <p className="text-xs text-gray-600 italic mt-3 border-t pt-2">
+                            <span className="font-bold not-italic text-nagumo-700">Explanation: </span>
+                            {q.explanation}
+                        </p>
+                    )}
+                </div>
+            );
+        })}
+    </div>
+  );
+
+  // Main Result Screen rendering (Visible to User)
   return (
     <div className="min-h-screen bg-gray-100 py-12 px-4">
       <div className="max-w-4xl mx-auto space-y-8">
         
         {/* Header Results */}
+        {/* ... (Omitted Header Results for brevity, assuming it remains the same) ... */}
+        
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           <div className="bg-slate-800 text-white p-6 text-center">
              <h2 className="text-3xl font-bold">Assessment Results for {studentName}</h2>
              <p className="opacity-80">Here is the breakdown of your performance</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-200">
-             {/* Vocab Column */}
              <div className="p-8 flex flex-col items-center">
                 <h3 className="text-xl font-bold text-gray-700 mb-4">Vocabulary</h3>
                 <div className="text-5xl font-extrabold text-blue-600 mb-2">{vocabScore.correct}/50</div>
@@ -429,7 +575,6 @@ const ResultScreen: React.FC<{
                   <span className="text-gray-600 font-medium">IELTS ~{getIeltsScore(vocabLevel)}</span>
                 </div>
              </div>
-             {/* Grammar Column */}
              <div className="p-8 flex flex-col items-center">
                 <h3 className="text-xl font-bold text-gray-700 mb-4">Grammar</h3>
                 <div className="text-5xl font-extrabold text-indigo-600 mb-2">{grammarScore.correct}/50</div>
@@ -442,45 +587,21 @@ const ResultScreen: React.FC<{
           </div>
         </div>
 
-        {/* Nagumo Yoichi Feedback Card */}
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-nagumo-200 relative">
-          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-nagumo-400 to-nagumo-600"></div>
-          <div className="flex flex-col md:flex-row">
-            {/* Image Section */}
-            <div className="w-full md:w-2/5 bg-slate-50 flex flex-col items-center justify-start p-0 border-b md:border-b-0 md:border-r border-gray-100">
-              <div className="w-full h-full min-h-[300px] md:min-h-[400px] relative overflow-hidden group">
-                <img 
-                  src={NAGUMO_IMAGE_URL}
-                  alt="Nagumo Yoichi" 
-                  className="w-full h-full object-contain transition duration-700" 
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-                   <h4 className="font-bold text-xl text-white">Nagumo Yoichi</h4>
-                   <p className="text-sm text-gray-300 uppercase tracking-wider font-semibold">Student Council</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Comment Section */}
-            <div className="w-full md:w-3/5 p-8 flex flex-col justify-center">
-              <h3 className="text-nagumo-800 font-black text-xl uppercase tracking-widest mb-4 flex items-center">
-                <span className="w-2 h-8 bg-nagumo-500 mr-3 inline-block rounded-sm"></span>
-                NAGUMO YOICHI WOULD SAY:
-              </h3>
-              <div className="prose prose-blue max-w-none text-gray-700 leading-relaxed italic bg-gray-50 p-6 rounded-lg border border-gray-100 relative shadow-inner">
-                <span className="absolute top-2 left-2 text-4xl text-gray-300 font-serif">"</span>
-                {getNagumoComment().split('\n\n').map((paragraph, idx) => (
-                  <p key={idx} className="mb-4 last:mb-0 relative z-10">{paragraph}</p>
-                ))}
-                <span className="absolute bottom-[-10px] right-4 text-4xl text-gray-300 font-serif">"</span>
-              </div>
-            </div>
-          </div>
+        {/* PDF BUTTON */}
+        <div className="text-center">
+            <button 
+               onClick={handlePrintToPDF}
+               className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition transform hover:-translate-y-0.5 focus:ring-4 focus:ring-red-300 flex items-center mx-auto"
+            >
+               <span className="mr-2">🖨️</span> Export Full Report (PDF)
+            </button>
         </div>
 
-        {/* Detailed Analysis (Including new Vocab Corrections) */}
+        {/* Nagumo Yoichi Feedback Card */}
+        {/* ... (Omitted Nagumo Feedback Card for brevity, keeping only the new breakdown) ... */}
+
+        {/* Detailed Analysis (Grammar Focus Areas) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column: Grammar Focus Areas */}
           <div className="bg-white rounded-2xl shadow-lg p-8">
              <h3 className="text-xl font-bold text-gray-800 mb-6">Grammar Focus Areas</h3>
              <div className="space-y-4">
@@ -500,81 +621,10 @@ const ResultScreen: React.FC<{
                ))}
              </div>
           </div>
-
-          {/* Right Column: Corrections Cards (Grouped vertically) */}
-          <div className="space-y-8">
-            
-            {/* 1. VOCABULARY CORRECTIONS (This renders the requested Vocab Key) */}
-            {incorrectVocabQuestions.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-lg p-8">
-                <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
-                  Vocabulary Corrections
-                  <span className="ml-2 bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">{incorrectVocabQuestions.length} mistakes</span>
-                </h3>
-                <div className="space-y-6 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                  {incorrectVocabQuestions.map((q) => (
-                    <div key={q.id} className="border-l-4 border-red-400 pl-4 py-2 bg-red-50 rounded-r-lg">
-                      <p className="text-sm font-semibold text-gray-900 mb-1">{q.id}: {q.text}</p>
-                      
-                      <div className="flex flex-wrap gap-2 text-sm mb-2">
-                        <span className="px-2 py-0.5 bg-red-200 text-red-800 rounded">
-                          <span className="font-bold">You:</span> {answers[q.id] ? q.options[answers[q.id]] : 'No Answer'}
-                        </span>
-                        <span className="px-2 py-0.5 bg-green-200 text-green-800 rounded">
-                          <span className="font-bold">Correct:</span> {q.options[q.correctOption]}
-                        </span>
-                      </div>
-
-                      {q.explanation && (
-                        <p className="text-sm text-gray-700 italic">
-                          <span className="font-bold not-italic text-nagumo-700">Why? </span>
-                          {q.explanation}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 2. GRAMMAR CORRECTIONS */}
-            {incorrectGrammarQuestions.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-lg p-8">
-                <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
-                  Grammar Corrections
-                  <span className="ml-2 bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">{incorrectGrammarQuestions.length} mistakes</span>
-                </h3>
-                <div className="space-y-6 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                  {incorrectGrammarQuestions.map((q) => (
-                    <div key={q.id} className="border-l-4 border-red-400 pl-4 py-2 bg-red-50 rounded-r-lg">
-                      <p className="text-sm font-semibold text-gray-900 mb-1">{q.id}: {q.text}</p>
-                      
-                      <div className="flex flex-wrap gap-2 text-sm mb-2">
-                        <span className="px-2 py-0.5 bg-red-200 text-red-800 rounded">
-                          <span className="font-bold">You:</span> {answers[q.id] ? q.options[answers[q.id]] : 'No Answer'}
-                        </span>
-                        <span className="px-2 py-0.5 bg-green-200 text-green-800 rounded">
-                          <span className="font-bold">Correct:</span> {q.options[q.correctOption]}
-                        </span>
-                      </div>
-
-                      {q.explanation && (
-                        <p className="text-sm text-gray-700 italic">
-                          <span className="font-bold not-italic text-nagumo-700">Why? </span>
-                          {q.explanation}
-                        </p>
-                      )}
-                      
-                      <div className="mt-2 text-xs text-gray-500 uppercase font-bold tracking-wider">
-                        {q.grammarArea}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
         </div>
+        
+        {/* Render the full breakdown directly on the screen */}
+        <PrintableReport />
 
         <div className="text-center pb-8">
           <button 
@@ -586,6 +636,9 @@ const ResultScreen: React.FC<{
         </div>
 
       </div>
+      
+      {/* Hidden container is no longer needed since PrintableReport is rendered directly for print/PDF */}
+      
     </div>
   );
 };
@@ -601,8 +654,33 @@ const App: React.FC = () => {
     extensionsUsed: 0,
     studentName: ''
   });
+  
+  // Track time taken specifically for the result screen
+  const [timeTaken, setTimeTaken] = useState(0); 
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (testState.status === 'active') {
+      // Start a timer that increments timeTaken every second
+      timerRef.current = setInterval(() => {
+        setTimeTaken(prevTime => prevTime + 1);
+      }, 1000);
+    } else if (timerRef.current) {
+      // Clear the timer when the test is submitted or restarted
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    // Cleanup on unmount
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [testState.status]);
 
   const startTest = (withTimer: boolean, name: string) => {
+    // Reset timeTaken to 0 when starting a new test
+    setTimeTaken(0); 
     setTestState({
       status: 'active',
       timerEnabled: withTimer,
@@ -630,7 +708,8 @@ const App: React.FC = () => {
   };
 
   return (
-    <div>
+    // FIX: Re-implementing the CSS fix that prevents horizontal overflow
+    <div className="max-w-full overflow-x-hidden">
       {testState.status === 'intro' && <IntroScreen onStart={startTest} />}
       {testState.status === 'active' && (
         <TestScreen 
@@ -644,6 +723,7 @@ const App: React.FC = () => {
           answers={testState.answers} 
           onRetry={restartTest} 
           studentName={testState.studentName}
+          timeTaken={timeTaken} // Pass time taken for the report
         />
       )}
     </div>
